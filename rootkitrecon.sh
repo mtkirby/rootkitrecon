@@ -1,5 +1,5 @@
 #!/bin/bash
-# 20180220 Kirby
+# 20181120 Kirby
 
 
 umask 077
@@ -21,32 +21,54 @@ unset PYTHONPATH
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:$PATH
 export LD_LIBRARY_PATH=/lib64:/usr/lib64:/lib:/usr/lib:/usr/lib32:/lib32:$LD_LIBRARY_PATH
 export HOSTNAME=$(uname -n)
+export LINEBANNER="--------------------------------------------------------------------------------"
+export BANNER="################################################################################"
 
 ##################################################
 function MAIN()
 {
     local func
     local logdir="/tmp/rootkitrecon.$HOSTNAME"
+	declare -A functions
+
+	functions['pkgcheck']="Performs rpm and dpkg integrity checks and only report on files that do not match the package contents. This is more useful than a traditional FIM as it continually alerts on file integrity mismatches. Traditional FIM often has false positives resulting from system patching. What admins should look for: Any checksum mismatch could be a sign of a rootkit."
+	functions['procpkgcheck']="Examines running processes and only report on executables that do not belong to a known rpm or dpkg. It will ignore any processes in a docker and/or lxc container. What admins should look for: Any process that does not belong to a known rpm or dpkg could be from a rootkit"
+	functions['patchinfo']="Shows a count of missing security patches and last patch dates."
+	functions['libkitcheck']="This report shows results from examining the ld library cache and check each library file to make sure it belongs to a known installed package. Next, it will examine the loaded libraries for each process and again check to make sure it belongs to a known installed package as well as alert for any process that was executed with LD_PRELOAD. What admins should look for: Anything in this report is highly suspicious and likely a library rootkit."
+	functions['modpkgcheck']="Shows active kernel modules that do not belong to an rpm or dpkg package. What admins should look for: Any kernel module that is not part of an rpm or dpkg package could be a rootkit."
+	functions['localusersecurity']="This report shows local users and if they have a password set, have an ssh key, and lists their .ssh directory and any history files in their home. What admins should look for: Look for unknown accounts. Examine authorized_keys for unknown keys. Look at history files for suspicious activity."
+	functions['socketlist']="Shows what programs, and users, that have listening sockets and established connections. What admins should look for: Unknown listeners and outbound connections that may be a reverse shell."
+	functions['nonpkgcheck']="Finds all the directories that were created by packages and then searches those directories for files that do not belong to a package. What admins should look for: There will be false positives. Look for mystery executables."
+	functions['procinfo']="Information on all running processes"
+	functions['ausession']="Shows audit logs for all running sessions."
+	functions['aureports']="Shows audit reports."
+	functions['getlast']="Grab last logins and reboots."
 
     mkdir "$logdir" >/dev/null 2>&1
 
     echo "This will take a few minutes.  Output files are in ${logdir}"
-    for func in pkgcheck procpkgcheck patchinfo libkitcheck modpkgcheck localusers socketlist nonpkgcheck procinfo ausession
+    for func in ${!functions[@]}
     do
-        echo "Running $func"
+        echo "$LINEBANNER"
+        echo "Running $func -- ${functions[$func]}"
         $func > ${logdir}/rkrecon-$HOSTNAME.$func.txt 2>&1
+		echo "Log file is ${logdir}/rkrecon-$HOSTNAME.$func.txt"
+		echo ''
     done
     ps -efwww --cols 5000 --cumulative > ${logdir}/rkrecon-$HOSTNAME.ps-efwww.txt 2>&1
     ps -efwww --forest --cols 5000 --cumulative > ${logdir}/rkrecon-$HOSTNAME.ps-efwww-forest.txt 2>&1
-    pstree -clapSTunGs > ${logdir}/rkrecon-$HOSTNAME.pstree-clapSTunGs.txt 2>&1
-    ip netns list > ${logdir}/rkrecon-$HOSTNAME.ip-netns-list.txt 2>&1
-    docker ps > ${logdir}/rkrecon-$HOSTNAME.docker-ps.txt 2>&1
+    pstree -clapSunGs > ${logdir}/rkrecon-$HOSTNAME.pstree-clapSunGs.txt 2>&1
+    ip netns list |egrep -q . && ip netns list > ${logdir}/rkrecon-$HOSTNAME.ip-netns-list.txt 2>&1
+    docker ps 2>/dev/null |egrep -q . && docker ps > ${logdir}/rkrecon-$HOSTNAME.docker-ps.txt 2>&1
     lsof -Pni > ${logdir}/rkrecon-$HOSTNAME.lsof-Pni.txt 2>&1
     lsof > ${logdir}/rkrecon-$HOSTNAME.lsof.txt 2>&1
 
-    echo "tarball of logs is /tmp/rootkitrecon.$HOSTNAME.tgz"
-    rm -f /tmp/rootkitrecon.$HOSTNAME.tgz 2>/dev/null
-    tar cfz /tmp/rootkitrecon.$HOSTNAME.tgz ${logdir} >/dev/null 2>&1
+	echo ''
+	echo "tarball of logs is /tmp/rootkitrecon.$HOSTNAME.tgz"
+	rm -f /tmp/rootkitrecon.$HOSTNAME.tgz 2>/dev/null
+	cd /tmp
+	tar cfz /tmp/rootkitrecon.$HOSTNAME.tgz ${logdir##*/} >/dev/null 2>&1
+    echo "done"
 }
 
 ##################################################
@@ -129,10 +151,10 @@ function printfileinfo()
     fi
 
     #echo "file=\"$file\" fileowner=\"$fileowner\" filemode=\"$filemode\" octmode=\"$octmode\" mountpoint=\"$mountpoint\" fstype=\"$fstype\" checkowner=\"$checkowner\" checkownerdesc=\"$checkownerdesc\" sha1sum=\"$sha1sum\" $extrainfo $alarm"
-    echo "FILE $file"
-    echo "FILEOWNER $fileowner  FILEMODE $filemode OCTMODE $octmode  MOUNTPOINT $mountpoint FSTYPE $fstype"
-    echo "CHECKOWNER $checkowner CHECKOWNERDESC $checkownerdesc"
-    echo "SHA1SUM $sha1sum"
+    echo "FILE=$file"
+    echo "FILEOWNER=$fileowner  FILEMODE=$filemode OCTMODE=$octmode  MOUNTPOINT=$mountpoint FSTYPE=$fstype"
+    echo "CHECKOWNER=$checkowner CHECKOWNERDESC=$checkownerdesc"
+    echo "SHA1SUM=$sha1sum"
     echo "$extrainfo $alarm"
 }
 
@@ -193,7 +215,7 @@ function rpmcheck()
             [[ "${attr:7:1}" == "T" ]] && comments+=("mtime differs. ")
             [[ "${attr:8:1}" == "P" ]] && comments+=("capabilities differ. ")
             flatcomments=$(join_by '  ' "${comments[@]}")
-            echo "--------------------------------------------------------------------------------"
+            echo "$LINEBANNER"
             echo "FILE $file"
             echo "PKG $pkg"
             echo "ATTR $attr $flatcomments"
@@ -230,7 +252,7 @@ function dpkgcheck()
             [[ "$attr" == "missing" ]] && comments+=("file is missing.")
             [[ "${attr:2:1}" == "5" ]] && comments+=("digest differs.")
             flatcomments=$(join_by '  ' "${comments[@]}")
-            echo "--------------------------------------------------------------------------------"
+            echo "$LINEBANNER"
             echo "FILE $file"
             echo "PKG $pkg"
             echo "ATTR $attr $flatcomments"
@@ -314,18 +336,20 @@ function procpkgcheck()
     local proccount=0
     local chrootcount=0
     local pid
+	local piddir
     local file
     local procowner
     local procuid
     local loginuid
 
-    for pid in /proc/[0-9]*
+    for piddir in /proc/[0-9]*
     do
+		pid=${piddir##*/}
         ((proccount++))
     
         # Check to see if exe file exists.
         # Sometimes a program will create a temporary script and delete it while running.
-        file=$(stat -c '%N' "$pid/exe" 2>/dev/null |grep ' -> '|sed -e "s/.*-> .\(\/.*\).$/\1/")
+        file=$(stat -c '%N' "$piddir/exe" 2>/dev/null |grep ' -> '|sed -e "s/.*-> .\(\/.*\).$/\1/")
         file=$(readlink -f "$file")
         if [[ ! -f "$file" ]]
         then
@@ -335,7 +359,7 @@ function procpkgcheck()
         #
         # Ignore process if it is within a container or chroot
         #   
-        if ! egrep -q '^/$' "$pid"/cpuset >/dev/null 2>&1
+        if ! egrep -q '^/$' "$piddir"/cpuset >/dev/null 2>&1
         then
             ((chrootcount++))
             continue
@@ -351,10 +375,13 @@ function procpkgcheck()
         if ! rpm -qf "$file" >/dev/null 2>&1 \
         && ! dpkg-query -S "$file" >/dev/null 2>&1
         then
-            procowner=$(stat -c '%U' "$pid")
-            procuid=$(stat -c '%u' "$pid")
-            loginuid=$(cat "$pid"/loginuid)
-            printfileinfo "$file" "$procowner" "Process owner" "pid=\"${pid##*/}\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""   
+            procowner=$(stat -c '%U' "$piddir")
+            procuid=$(stat -c '%u' "$piddir")
+            loginuid=$(cat "$piddir"/loginuid)
+            printfileinfo "$file" "$procowner" "Process owner" "pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""   
+			ps -fwwwp $pid
+			echo "$LINEBANNER"
+			echo ''
         fi
     done
 }
@@ -392,8 +419,15 @@ function patchinfo()
             notices+=($type=$num)
         done
         alarm="$(join_by ' ' "${notices[@]}")"
+		if [[ -z ${notices[@]} ]]
+		then
+			echo "No missing security patches"
+		fi
+
         lastpatch=$($yum history |grep -i '| update ' |sed -e 's/.* \([0-9]*-[0-9]*-[0-9]*\) [0-9]*:[0-9]* .*/\1/' |head -1)
         echo "updater=\"$yum\" lastpatchdate=\"$lastpatch\" $alarm"
+		echo '';echo ''
+        $yum history 
     fi
     
     if which apt-get >/dev/null 2>&1
@@ -424,6 +458,7 @@ function libkitcheck()
     local libtotalcount
     local loginuid
     local pid
+	local piddir
     local preload
     local proclibcount
     local procowner
@@ -447,32 +482,36 @@ function libkitcheck()
         fi
     done
     
-    for pid in /proc/[0-9]*
+    for piddir in /proc/[0-9]*
     do
+		pid=${piddir##*/}
         # Check to see if exe file exists.
         # Sometimes a program will create a temporary script and delete it while running.
-        file=$(stat -c '%N' "$pid/exe" 2>/dev/null |grep ' -> '|sed -e "s/.*-> .\(\/.*\).$/\1/")
+        file=$(stat -c '%N' "$piddir/exe" 2>/dev/null |grep ' -> '|sed -e "s/.*-> .\(\/.*\).$/\1/")
         if [[ ! -f "$file" ]]
         then
             continue
         fi
     
         # Ignore process if it is within a container or chroot
-        if ! egrep -q '^/$' "$pid"/cpuset >/dev/null 2>&1
+        if ! egrep -q '^/$' "$piddir"/cpuset >/dev/null 2>&1
         then
             ((chrootcount++))
             continue
         fi
     
-        if preload=$(tr '\0' '\n' < "$pid"/environ |egrep '^LD_PRELOAD=' 2>&1)
+        if preload=$(tr '\0' '\n' < "$piddir"/environ |egrep '^LD_PRELOAD=' 2>&1)
         then
-            procowner=$(stat -c '%U' "$pid")
-            procuid=$(stat -c '%u' "$pid")
-            loginuid=$(cat "$pid"/loginuid)
-            printfileinfo "$file" "" "" "ALARM=\"LD_PRELOAD DETECTED\" preload=\"$preload\" process=\"$file\" pid=\"${pid##*/}\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
+            procowner=$(stat -c '%U' "$piddir")
+            procuid=$(stat -c '%u' "$piddir")
+            loginuid=$(cat "$piddir"/loginuid)
+            printfileinfo "$file" "" "" "ALARM=\"LD_PRELOAD DETECTED\" preload=\"$preload\" process=\"$file\" pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
+			ps -fwwwp $pid
+			echo "$LINEBANNER"
+			echo ''
         fi
     
-        for libfile in $(awk '/ r-xp .* fd:/ {print $6}' "$pid"/maps 2>/dev/null)
+        for libfile in $(awk '/ r-xp .* fd:/ {print $6}' "$piddir"/maps 2>/dev/null)
         do
             libfile=$(readlink -f "$libfile")
             if [[ ${libseen["$libfile"]} == 1 ]]
@@ -484,10 +523,13 @@ function libkitcheck()
             && ! rpm -qf "$libfile" >/dev/null 2>&1 \
             && ! dpkg -S "$libfile" >/dev/null 2>&1 
             then
-                procowner=$(stat -c '%U' "$pid")
-                procuid=$(stat -c '%u' "$pid")
-                loginuid=$(cat "$pid"/loginuid)
-                printfileinfo "$libfile" "" "" "ALARM=\"ALERT $libfile is not a package library\" process=\"$file\" pid=\"${pid##*/}\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
+                procowner=$(stat -c '%U' "$piddir")
+                procuid=$(stat -c '%u' "$piddir")
+                loginuid=$(cat "$piddir"/loginuid)
+                printfileinfo "$libfile" "" "" "ALARM=\"ALERT $libfile is not a package library\" process=\"$file\" pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
+				ps -fwwwp $pid
+				echo "$LINEBANNER"
+				echo ''
             else
                 libseen["$libfile"]=1
             fi
@@ -524,6 +566,8 @@ function modpkgcheck()
         && ! dpkg-query -S "$filename" >/dev/null 2>&1
         then
             echo "ALERT=\"No package for module=$module filename=$filename\""
+		else
+            echo "module $module is good"
         fi
     done
 }
@@ -623,7 +667,7 @@ function nonpkgcheck()
             && ! dpkg -S "$file" >/dev/null 2>&1
             then
                 ((checkcount++))
-                echo "--------------------------------------------------------------------------------"
+                echo "$LINEBANNER"
                 printfileinfo "$file" "" "" ""
             fi
         done
@@ -632,7 +676,7 @@ function nonpkgcheck()
 
 
 ##################################################
-function localusers()
+function localusersecurity()
 {
     local username
     local home
@@ -707,11 +751,17 @@ function localusers()
             pwexpiredate=""
         fi
     
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$username shell=$shell lastpasswd=\"$pwagedate\" haspw=\"$haspw\" hassshkey=\"$hassshkey\""
         ls -l $home/.ssh/* 2>/dev/null
         ls -l $home/*history 2>/dev/null
     done
+}
+
+##################################################
+function getlast()
+{
+	last -wx
 }
 
 ##################################################
@@ -732,11 +782,80 @@ function ausession()
             continue
         fi
 
-        echo "################################################################################"
+        echo "$BANNER"
         echo "session $session"
         ausearch -i --session $session
-        echo "################################################################################"
+        echo "$BANNER"
     done
+}
+
+##################################################
+function aureports()
+{
+    if ! which aureport >/dev/null 2>&1
+    then
+        return 0
+    fi
+
+    echo "$BANNER"
+    echo "aureport -i -au"
+    aureport -i -au
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -l"
+    aureport -i -l
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i --tty"
+    aureport -i --tty
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i --summary"
+    aureport -i --summary
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -f |egrep -v ' execve | open '"
+    aureport -i -f |egrep -v ' execve | open '
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i --integrity"
+    aureport -i --integrity
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -n"
+    aureport -i -n
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -r"
+    aureport -i -r
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -m"
+    aureport -i -m
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -ma"
+    aureport -i -ma
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -c -nc"
+    aureport -i -c -nc
+    echo "$BANNER"
+
+    echo "$BANNER"
+    echo "aureport -i -a"
+    aureport -i -a
+    echo "$BANNER"
 }
 
 ##################################################
@@ -746,35 +865,35 @@ function procinfo()
 
     for pid in /proc/[0-9]*
     do
-        echo "################################################################################"
-        echo "--------------------------------------------------------------------------------"
+        echo "$BANNER"
+        echo "$LINEBANNER"
         echo "$pid exe"
         ls -l $pid/exe
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid cwd"
         ls -l $pid/cwd
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid cmdline"
         cat $pid/cmdline |tr '\0' '\n' |uniq
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid environ"
         cat $pid/environ |tr '\0' '\n' |uniq
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid fd"
         ls -l $pid/fd/
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid ns"
         ls -l $pid/ns/
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid root"
         ls -l $pid/root
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid sessionid"
         sort $pid/sessionid 
-        echo "--------------------------------------------------------------------------------"
+        echo "$LINEBANNER"
         echo "$pid loginuid"
         sort $pid/loginuid 
-        echo "################################################################################"
+        echo "$BANNER"
     done
 }
 
@@ -802,11 +921,12 @@ function socketlist()
             chroot=$(cat /proc/"$pid"/cpuset)
             cmdline=$(tr '\0' ' ' < /proc/"$pid"/cmdline)
             user=$(id -nu "${socket[6]}")
-            echo "--------------------------------------------------------------------------------"
+            echo "$LINEBANNER"
             echo "$state ${socket[0]} LOCAL=${socket[3]} REMOTE=${socket[4]}"
             echo "UID=${socket[6]} USER=$user CHROOT=$chroot PID=$pid"
             echo "CMD=${cmdline}"
             printfileinfo "/proc/$pid/exe" "$user" "Process owner" ""
+			ps -fwwwp $pid
             echo ''
         done
     elif which ss >/dev/null 2>&1
@@ -821,11 +941,12 @@ function socketlist()
             cmdline=$(tr '\0' ' ' < /proc/"$pid"/cmdline)
             uid=$(stat -c '%u' /proc/"$pid")
             user=$(id -nu "$uid")
-            echo "--------------------------------------------------------------------------------"
+            echo "$LINEBANNER"
             echo "$state ${socket[1]} LOCAL=${socket[4]} REMOTE=${socket[5]}"
             echo "UID=$uid USER=$user CHROOT=$chroot PID=$pid"
             echo "CMD=${cmdline}"
             printfileinfo "/proc/$pid/exe" "$user" "Process owner" ""
+			ps -fwwwp $pid
         done
     fi
     
