@@ -1,7 +1,7 @@
 # rootkitrecon
 
 
-Rootkitrecon is a script that runs on an rpm/dpk system that reports suspicious activity.
+Rootkitrecon is a script that runs on an rpm/dpkg system that reports suspicious activity.
 
 Output files are:
 

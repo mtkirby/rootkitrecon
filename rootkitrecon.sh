@@ -1,5 +1,5 @@
 #!/bin/bash
-# 20181120 Kirby
+# 20181218 Kirby
 
 
 umask 077
@@ -68,6 +68,13 @@ function MAIN()
 	rm -f /tmp/rootkitrecon.$HOSTNAME.tgz 2>/dev/null
 	cd /tmp
 	tar cfz /tmp/rootkitrecon.$HOSTNAME.tgz ${logdir##*/} >/dev/null 2>&1
+    echo "$BANNER"
+    echo "Other tools to run:"
+    echo "    prochunter: https://gitlab.com/nowayout/prochunter"
+    echo "    rkhunter: https://sourceforge.net/projects/rkhunter/files/rkhunter/"
+    echo "    chkrootkit: http://www.chkrootkit.org/"
+    echo "    lynis: https://github.com/CISOfy/lynis"
+    echo "$BANNER"
     echo "done"
 }
 
