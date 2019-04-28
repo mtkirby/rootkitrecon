@@ -5,7 +5,7 @@ Rootkitrecon is a script that runs on an rpm/dpkg system that reports suspicious
 
 Output files are:
 
-
+################################################################################
 
 /tmp/rootkitrecon.$HOSTNAME/rkrecon-$HOSTNAME.libkitcheck
 
