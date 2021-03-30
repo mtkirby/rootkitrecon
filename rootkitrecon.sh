@@ -1,5 +1,5 @@
 #!/bin/bash
-# 20181218 Kirby
+# 20210330 Kirby
 
 
 umask 077
@@ -29,20 +29,20 @@ function MAIN()
 {
     local func
     local logdir="/tmp/rootkitrecon.$HOSTNAME"
-	declare -A functions
+    declare -A functions
 
-	functions['pkgcheck']="Performs rpm and dpkg integrity checks and only report on files that do not match the package contents. This is more useful than a traditional FIM as it continually alerts on file integrity mismatches. Traditional FIM often has false positives resulting from system patching. What admins should look for: Any checksum mismatch could be a sign of a rootkit."
-	functions['procpkgcheck']="Examines running processes and only report on executables that do not belong to a known rpm or dpkg. It will ignore any processes in a docker and/or lxc container. What admins should look for: Any process that does not belong to a known rpm or dpkg could be from a rootkit"
-	functions['patchinfo']="Shows a count of missing security patches and last patch dates."
-	functions['libkitcheck']="This report shows results from examining the ld library cache and check each library file to make sure it belongs to a known installed package. Next, it will examine the loaded libraries for each process and again check to make sure it belongs to a known installed package as well as alert for any process that was executed with LD_PRELOAD. What admins should look for: Anything in this report is highly suspicious and likely a library rootkit."
-	functions['modpkgcheck']="Shows active kernel modules that do not belong to an rpm or dpkg package. What admins should look for: Any kernel module that is not part of an rpm or dpkg package could be a rootkit."
-	functions['localusersecurity']="This report shows local users and if they have a password set, have an ssh key, and lists their .ssh directory and any history files in their home. What admins should look for: Look for unknown accounts. Examine authorized_keys for unknown keys. Look at history files for suspicious activity."
-	functions['socketlist']="Shows what programs, and users, that have listening sockets and established connections. What admins should look for: Unknown listeners and outbound connections that may be a reverse shell."
-	functions['nonpkgcheck']="Finds all the directories that were created by packages and then searches those directories for files that do not belong to a package. What admins should look for: There will be false positives. Look for mystery executables."
-	functions['procinfo']="Information on all running processes"
-	functions['ausession']="Shows audit logs for all running sessions."
-	functions['aureports']="Shows audit reports."
-	functions['getlast']="Grab last logins and reboots."
+    functions['pkgcheck']="Performs rpm and dpkg integrity checks and only report on files that do not match the package contents. This is more useful than a traditional FIM as it continually alerts on file integrity mismatches. Traditional FIM often has false positives resulting from system patching. What admins should look for: Any checksum mismatch could be a sign of a rootkit."
+    functions['procpkgcheck']="Examines running processes and only report on executables that do not belong to a known rpm or dpkg. It will ignore any processes in a docker and/or lxc container. What admins should look for: Any process that does not belong to a known rpm or dpkg could be from a rootkit"
+    functions['patchinfo']="Shows a count of missing security patches and last patch dates."
+    functions['libkitcheck']="This report shows results from examining the ld library cache and check each library file to make sure it belongs to a known installed package. Next, it will examine the loaded libraries for each process and again check to make sure it belongs to a known installed package as well as alert for any process that was executed with LD_PRELOAD. What admins should look for: Anything in this report is highly suspicious and likely a library rootkit."
+    functions['modpkgcheck']="Shows active kernel modules that do not belong to an rpm or dpkg package. What admins should look for: Any kernel module that is not part of an rpm or dpkg package could be a rootkit."
+    functions['localusersecurity']="This report shows local users and if they have a password set, have an ssh key, and lists their .ssh directory and any history files in their home. What admins should look for: Look for unknown accounts. Examine authorized_keys for unknown keys. Look at history files for suspicious activity."
+    functions['socketlist']="Shows what programs, and users, that have listening sockets and established connections. What admins should look for: Unknown listeners and outbound connections that may be a reverse shell."
+    functions['nonpkgcheck']="Finds all the directories that were created by packages and then searches those directories for files that do not belong to a package. What admins should look for: There will be false positives. Look for mystery executables."
+    functions['procinfo']="Information on all running processes"
+    functions['ausession']="Shows audit logs for all running sessions."
+    functions['aureports']="Shows audit reports."
+    functions['getlast']="Grab last logins and reboots."
 
     mkdir "$logdir" >/dev/null 2>&1
 
@@ -52,8 +52,8 @@ function MAIN()
         echo "$LINEBANNER"
         echo "Running $func -- ${functions[$func]}"
         $func > ${logdir}/rkrecon-$HOSTNAME.$func.txt 2>&1
-		echo "Log file is ${logdir}/rkrecon-$HOSTNAME.$func.txt"
-		echo ''
+        echo "Log file is ${logdir}/rkrecon-$HOSTNAME.$func.txt"
+        echo ''
     done
     ps -efwww --cols 5000 --cumulative > ${logdir}/rkrecon-$HOSTNAME.ps-efwww.txt 2>&1
     ps -efwww --forest --cols 5000 --cumulative > ${logdir}/rkrecon-$HOSTNAME.ps-efwww-forest.txt 2>&1
@@ -63,11 +63,11 @@ function MAIN()
     lsof -Pni > ${logdir}/rkrecon-$HOSTNAME.lsof-Pni.txt 2>&1
     lsof > ${logdir}/rkrecon-$HOSTNAME.lsof.txt 2>&1
 
-	echo ''
-	echo "tarball of logs is /tmp/rootkitrecon.$HOSTNAME.tgz"
-	rm -f /tmp/rootkitrecon.$HOSTNAME.tgz 2>/dev/null
-	cd /tmp
-	tar cfz /tmp/rootkitrecon.$HOSTNAME.tgz ${logdir##*/} >/dev/null 2>&1
+    echo ''
+    echo "tarball of logs is /tmp/rootkitrecon.$HOSTNAME.tgz"
+    rm -f /tmp/rootkitrecon.$HOSTNAME.tgz 2>/dev/null
+    cd /tmp
+    tar cfz /tmp/rootkitrecon.$HOSTNAME.tgz ${logdir##*/} >/dev/null 2>&1
     echo "$BANNER"
     echo "Other tools to run:"
     echo "    prochunter: https://gitlab.com/nowayout/prochunter"
@@ -343,7 +343,7 @@ function procpkgcheck()
     local proccount=0
     local chrootcount=0
     local pid
-	local piddir
+    local piddir
     local file
     local procowner
     local procuid
@@ -351,7 +351,7 @@ function procpkgcheck()
 
     for piddir in /proc/[0-9]*
     do
-		pid=${piddir##*/}
+        pid=${piddir##*/}
         ((proccount++))
     
         # Check to see if exe file exists.
@@ -386,9 +386,9 @@ function procpkgcheck()
             procuid=$(stat -c '%u' "$piddir")
             loginuid=$(cat "$piddir"/loginuid)
             printfileinfo "$file" "$procowner" "Process owner" "pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""   
-			ps -fwwwp $pid
-			echo "$LINEBANNER"
-			echo ''
+            ps -fwwwp $pid
+            echo "$LINEBANNER"
+            echo ''
         fi
     done
 }
@@ -426,14 +426,14 @@ function patchinfo()
             notices+=($type=$num)
         done
         alarm="$(join_by ' ' "${notices[@]}")"
-		if [[ -z ${notices[@]} ]]
-		then
-			echo "No missing security patches"
-		fi
+        if [[ -z ${notices[@]} ]]
+        then
+            echo "No missing security patches"
+        fi
 
         lastpatch=$($yum history |grep -i '| update ' |sed -e 's/.* \([0-9]*-[0-9]*-[0-9]*\) [0-9]*:[0-9]* .*/\1/' |head -1)
         echo "updater=\"$yum\" lastpatchdate=\"$lastpatch\" $alarm"
-		echo '';echo ''
+        echo '';echo ''
         $yum history 
     fi
     
@@ -465,7 +465,7 @@ function libkitcheck()
     local libtotalcount
     local loginuid
     local pid
-	local piddir
+    local piddir
     local preload
     local proclibcount
     local procowner
@@ -491,7 +491,7 @@ function libkitcheck()
     
     for piddir in /proc/[0-9]*
     do
-		pid=${piddir##*/}
+        pid=${piddir##*/}
         # Check to see if exe file exists.
         # Sometimes a program will create a temporary script and delete it while running.
         file=$(stat -c '%N' "$piddir/exe" 2>/dev/null |grep ' -> '|sed -e "s/.*-> .\(\/.*\).$/\1/")
@@ -513,9 +513,9 @@ function libkitcheck()
             procuid=$(stat -c '%u' "$piddir")
             loginuid=$(cat "$piddir"/loginuid)
             printfileinfo "$file" "" "" "ALARM=\"LD_PRELOAD DETECTED\" preload=\"$preload\" process=\"$file\" pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
-			ps -fwwwp $pid
-			echo "$LINEBANNER"
-			echo ''
+            ps -fwwwp $pid
+            echo "$LINEBANNER"
+            echo ''
         fi
     
         for libfile in $(awk '/ r-xp .* fd:/ {print $6}' "$piddir"/maps 2>/dev/null)
@@ -534,9 +534,9 @@ function libkitcheck()
                 procuid=$(stat -c '%u' "$piddir")
                 loginuid=$(cat "$piddir"/loginuid)
                 printfileinfo "$libfile" "" "" "ALARM=\"ALERT $libfile is not a package library\" process=\"$file\" pid=\"$pid\" procowner=\"$procowner\" procuid=\"$procuid\" loginuid=\"$loginuid\""
-				ps -fwwwp $pid
-				echo "$LINEBANNER"
-				echo ''
+                ps -fwwwp $pid
+                echo "$LINEBANNER"
+                echo ''
             else
                 libseen["$libfile"]=1
             fi
@@ -573,7 +573,7 @@ function modpkgcheck()
         && ! dpkg-query -S "$filename" >/dev/null 2>&1
         then
             echo "ALERT=\"No package for module=$module filename=$filename\""
-		else
+        else
             echo "module $module is good"
         fi
     done
@@ -702,7 +702,8 @@ function localusersecurity()
     usercount=0
     for line in $(cat /etc/passwd)
     do 
-        IFS=':' passwd=($line)
+        #IFS=':' passwd=($line)
+        IFS=':' read -ra passwd <<< "$line"
         IFS=$'\n'
         username=${passwd[0]}
         home=${passwd[5]}
@@ -724,8 +725,9 @@ function localusersecurity()
         fi
     
         # DES is 13 chars, so match at least 13
-        shadowline=$(egrep "^$username:" /etc/shadow)
-        IFS=':' shadow=($shadowline)
+        shadowline="$(egrep "^$username:" /etc/shadow)"
+        #IFS=':' shadow=($shadowline)
+        IFS=':' read -ra shadow <<< "$shadowline"
         IFS=$'\n'
         if [[ "${#shadow[1]}" -ge 13 ]]
         then 
@@ -740,7 +742,6 @@ function localusersecurity()
         then
             continue
         fi
-    
         pwage=${shadow[2]}
         if [[ "x$pwage" == "x" ]]
         then
@@ -768,7 +769,7 @@ function localusersecurity()
 ##################################################
 function getlast()
 {
-	last -wx
+    last -wx
 }
 
 ##################################################
@@ -922,7 +923,8 @@ function socketlist()
         for line in $(netstat -peanut|sort -rk 6| awk '{ if ($6 == "LISTEN" || $6 == "ESTABLISHED") print }' |sed -e 's/[[:space:]][[:space:]]*/ /g')
         do
             local IFS=' '
-            socket=($line)
+            #socket=($line)
+            read -ra socket <<< "$line"
             pid=${socket[8]%/*}
             state=${socket[5]}
             chroot=$(cat /proc/"$pid"/cpuset)
@@ -933,7 +935,7 @@ function socketlist()
             echo "UID=${socket[6]} USER=$user CHROOT=$chroot PID=$pid"
             echo "CMD=${cmdline}"
             printfileinfo "/proc/$pid/exe" "$user" "Process owner" ""
-			ps -fwwwp $pid
+            ps -fwwwp $pid
             echo ''
         done
     elif which ss >/dev/null 2>&1
@@ -942,7 +944,8 @@ function socketlist()
         for line in $(ss -n -l -p -ut|awk '{ if ($2 == "LISTEN" || $2 == "UNCONN") print }' |sed -e 's/[[:space:]][[:space:]]*/ /g')
         do
             local IFS=' '
-            socket=($line)
+            #socket=($line)
+            read -ra socket <<< "$line"
             pid=$(echo "${socket[6]}" |sed -e 's/.*,pid=\([[:digit:]]*\),.*/\1/')
             chroot=$(cat /proc/"$pid"/cpuset)
             cmdline=$(tr '\0' ' ' < /proc/"$pid"/cmdline)
@@ -953,7 +956,7 @@ function socketlist()
             echo "UID=$uid USER=$user CHROOT=$chroot PID=$pid"
             echo "CMD=${cmdline}"
             printfileinfo "/proc/$pid/exe" "$user" "Process owner" ""
-			ps -fwwwp $pid
+            ps -fwwwp $pid
         done
     fi
     
