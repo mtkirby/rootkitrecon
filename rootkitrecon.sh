@@ -1,5 +1,5 @@
 #!/bin/bash
-# 20210330 Kirby
+# 20240219 Kirby
 
 
 umask 077
@@ -43,6 +43,7 @@ function MAIN()
     functions['ausession']="Shows audit logs for all running sessions."
     functions['aureports']="Shows audit reports."
     functions['getlast']="Grab last logins and reboots."
+    functions['sctimers']="Show systemd timers"
 
     mkdir "$logdir" >/dev/null 2>&1
 
@@ -903,6 +904,16 @@ function procinfo()
         sort $pid/loginuid 
         echo "$BANNER"
     done
+}
+
+
+##################################################
+function sctimers()
+{
+    echo "$LINEBANNER"
+    systemctl list-timers --all
+    echo "$LINEBANNER"
+    ls -lah /run/systemd/transient/
 }
 
 ##################################################
