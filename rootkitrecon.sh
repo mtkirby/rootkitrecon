@@ -913,7 +913,7 @@ function sctimers()
     echo "$LINEBANNER"
     systemctl list-timers --all
     echo "$LINEBANNER"
-    ls -lah /run/systemd/transient/
+    ls -lah /run/systemd/transient/ /run/user/*/systemd/transient/
 }
 
 ##################################################
